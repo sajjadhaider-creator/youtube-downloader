@@ -1,11 +1,20 @@
 import streamlit as st
 import requests
-import time
 
 st.set_page_config(page_title="YouTube Downloader", page_icon="🎬")
 
 st.title("🎬 YouTube Downloader")
 st.write("Download YouTube videos or convert to MP3 easily!")
+
+def extract_video_id(url):
+    if "shorts/" in url:
+        return url.split("shorts/")[1].split("?")[0]
+    elif "v=" in url:
+        return url.split("v=")[1].split("&")[0]
+    elif "youtu.be/" in url:
+        return url.split("youtu.be/")[1].split("?")[0]
+    else:
+        return url.strip()
 
 url = st.text_input("🔗 Paste YouTube URL here:")
 option = st.radio("Choose download type:", ["🎵 Audio (MP3)", "🎵 Audio (M4A)"])
@@ -18,19 +27,12 @@ if download_btn:
         with st.spinner("Processing... please wait ⏳"):
             try:
                 api_key = st.secrets["RAPIDAPI_KEY"]
+                video_id = extract_video_id(url)
 
                 headers = {
                     "x-rapidapi-host": "youtube-mp3-audio-video-downloader.p.rapidapi.com",
                     "x-rapidapi-key": api_key
                 }
-
-                # Extract video ID from URL
-                if "v=" in url:
-                    video_id = url.split("v=")[1].split("&")[0]
-                elif "youtu.be/" in url:
-                    video_id = url.split("youtu.be/")[1].split("?")[0]
-                else:
-                    video_id = url
 
                 if option == "🎵 Audio (MP3)":
                     api_url = f"https://youtube-mp3-audio-video-downloader.p.rapidapi.com/get_mp3_download_link/{video_id}"
@@ -45,7 +47,6 @@ if download_btn:
 
                 response = requests.get(api_url, headers=headers, params=params)
                 data = response.json()
-                st.write(data)  # debug - dekho kya aa raha hai
 
                 if "link" in data:
                     download_url = data["link"]
@@ -61,6 +62,8 @@ if download_btn:
                         file_name=f"{title}{file_ext}",
                         mime=mime_type
                     )
+                elif "your_link" in data:
+                    st.warning("⏳ File abhi ready nahi — 30 seconds baad dobara try karo!")
                 else:
                     st.error(f"❌ Error: {data}")
 
