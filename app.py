@@ -1,7 +1,5 @@
 import streamlit as st
-import yt_dlp
-import os
-import tempfile
+import requests
 
 st.set_page_config(page_title="YouTube Downloader", page_icon="🎬")
 
@@ -16,48 +14,35 @@ if download_btn:
     if url == "":
         st.warning("Please enter a YouTube URL first!")
     else:
-        with st.spinner("Downloading... please wait ⏳"):
+        with st.spinner("Processing... please wait ⏳"):
             try:
-                tmpdir = tempfile.mkdtemp()
-
-                po_token = st.secrets.get("PO_TOKEN", "")
-                visitor_data = st.secrets.get("VISITOR_DATA", "")
-
-                ydl_opts = {
-                    'format': 'best[ext=mp4]/best' if option == "🎥 Video (MP4)" else 'bestaudio/best',
-                    'outtmpl': f'{tmpdir}/%(title)s.%(ext)s',
-                    'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    },
-                    'extractor_args': {
-                        'youtube': {
-                            'po_token': [f'web+{po_token}'] if po_token else [],
-                            'visitor_data': [visitor_data] if visitor_data else [],
-                        }
-                    },
+                api_key = st.secrets["RAPIDAPI_KEY"]
+                
+                headers = {
+                    "x-rapidapi-host": "youtube-mp3-audio-video-downloader.p.rapidapi.com",
+                    "x-rapidapi-key": api_key
                 }
 
                 if option == "🎵 Audio (MP3)":
-                    ydl_opts['postprocessors'] = [{
-                        'key': 'FFmpegExtractAudio',
-                        'preferredcodec': 'mp3',
-                        'preferredquality': '192',
-                    }]
+                    api_url = "https://youtube-mp3-audio-video-downloader.p.rapidapi.com/download/mp3"
+                    params = {"url": url, "quality": "192"}
                     mime_type = "audio/mpeg"
                     file_ext = ".mp3"
                 else:
+                    api_url = "https://youtube-mp3-audio-video-downloader.p.rapidapi.com/download/mp4"
+                    params = {"url": url, "quality": "720"}
                     mime_type = "video/mp4"
                     file_ext = ".mp4"
 
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=True)
-                    title = info.get('title', 'file')
+                response = requests.get(api_url, headers=headers, params=params)
+                data = response.json()
 
-                files = os.listdir(tmpdir)
-                if files:
-                    file_path = os.path.join(tmpdir, files[0])
-                    with open(file_path, 'rb') as f:
-                        file_bytes = f.read()
+                if "link" in data:
+                    download_url = data["link"]
+                    title = data.get("title", "video")
+
+                    file_response = requests.get(download_url)
+                    file_bytes = file_response.content
 
                     st.success(f"✅ Ready: **{title}**")
                     st.download_button(
@@ -66,6 +51,8 @@ if download_btn:
                         file_name=f"{title}{file_ext}",
                         mime=mime_type
                     )
+                else:
+                    st.error(f"❌ Error: {data}")
 
             except Exception as e:
                 st.error(f"❌ Error: {e}")
