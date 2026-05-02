@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import time
 
 st.set_page_config(page_title="YouTube Downloader", page_icon="🎬")
 
@@ -16,6 +17,14 @@ def extract_video_id(url):
     else:
         return url.strip()
 
+def wait_for_file(file_url, max_wait=300):
+    for i in range(0, max_wait, 10):
+        response = requests.get(file_url)
+        if response.status_code == 200:
+            return response.content
+        time.sleep(10)
+    return None
+
 url = st.text_input("🔗 Paste YouTube URL here:")
 option = st.radio("Choose download type:", ["🎵 Audio (MP3)", "🎵 Audio (M4A)"])
 download_btn = st.button("Download")
@@ -24,7 +33,7 @@ if download_btn:
     if url == "":
         st.warning("Please enter a YouTube URL first!")
     else:
-        with st.spinner("Processing... please wait ⏳"):
+        with st.spinner("Processing... please wait ⏳ (may take up to 2 minutes)"):
             try:
                 api_key = st.secrets["RAPIDAPI_KEY"]
                 video_id = extract_video_id(url)
@@ -48,22 +57,30 @@ if download_btn:
                 response = requests.get(api_url, headers=headers, params=params)
                 data = response.json()
 
+                download_url = None
+                title = "audio"
+
                 if "link" in data:
                     download_url = data["link"]
                     title = data.get("title", "audio")
+                elif "file" in data:
+                    download_url = data["file"]
+                    title = data.get("title", "audio")
 
-                    file_response = requests.get(download_url)
-                    file_bytes = file_response.content
+                if download_url:
+                    st.info("⏳ File ready ho rahi hai — please wait...")
+                    file_bytes = wait_for_file(download_url)
 
-                    st.success(f"✅ Ready: **{title}**")
-                    st.download_button(
-                        label="⬇️ Click here to Download",
-                        data=file_bytes,
-                        file_name=f"{title}{file_ext}",
-                        mime=mime_type
-                    )
-                elif "your_link" in data:
-                    st.warning("⏳ File abhi ready nahi — 30 seconds baad dobara try karo!")
+                    if file_bytes:
+                        st.success(f"✅ Ready: **{title}**")
+                        st.download_button(
+                            label="⬇️ Click here to Download",
+                            data=file_bytes,
+                            file_name=f"{title}{file_ext}",
+                            mime=mime_type
+                        )
+                    else:
+                        st.error("❌ File ready nahi hui — dobara try karo!")
                 else:
                     st.error(f"❌ Error: {data}")
 
